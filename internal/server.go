@@ -2,7 +2,7 @@ package internal
 
 import (
 	"errors"
-	"github.com/Mort4lis/ws-echo-server/internal/handlers/ws"
+	wsHandlers "github.com/Mort4lis/ws-echo-server/internal/websocket/handlers"
 	"log"
 	"net"
 	"net/http"
@@ -18,7 +18,7 @@ type App struct {
 
 func NewApp() *App {
 	mux := http.NewServeMux()
-	ws.RegisterHTTPHandlers(mux)
+	wsHandlers.RegisterHTTPHandlers(mux)
 
 	return &App{
 		server: &http.Server{
