@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"bufio"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
@@ -19,6 +20,7 @@ var rawRespTemplate = "HTTP/1.1 101 Switching Protocols\n" +
 
 type Websocket struct {
 	conn    net.Conn
+	buff    *bufio.ReadWriter
 	headers http.Header
 }
 
@@ -28,13 +30,14 @@ func NewWebsocket(w http.ResponseWriter, req *http.Request) (*Websocket, error) 
 		return nil, errors.New("can't get control over tcp connection")
 	}
 
-	conn, _, err := hj.Hijack()
+	conn, buff, err := hj.Hijack()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Websocket{
 		conn:    conn,
+		buff:    buff,
 		headers: req.Header,
 	}, nil
 }

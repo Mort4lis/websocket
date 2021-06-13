@@ -16,4 +16,11 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 	if err = ws.Handshake(); err != nil {
 		log.Println(err)
 	}
+
+	frame, err := ws.Receive()
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Printf("%#v", frame)
 }
