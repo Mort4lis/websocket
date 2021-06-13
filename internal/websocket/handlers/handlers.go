@@ -18,6 +18,13 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 		log.Println(err)
 	}
 
+	defer func() {
+		err = ws.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
 	frame, err := ws.Receive()
 	if err != nil {
 		log.Println(err)

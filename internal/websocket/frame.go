@@ -113,3 +113,15 @@ func (ws *Websocket) write(data []byte) error {
 	}
 	return ws.rw.Flush()
 }
+
+func (ws *Websocket) Close() error {
+	frame := Frame{
+		Opcode:  0x08,
+		Payload: make([]byte, 2),
+	}
+	if err := ws.Send(frame); err != nil {
+		return err
+	}
+
+	return ws.conn.Close()
+}
