@@ -22,5 +22,5 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 		log.Println(err)
 	}
 
-	log.Printf("%#v", frame)
+	log.Printf("%s", frame.Payload)
 }

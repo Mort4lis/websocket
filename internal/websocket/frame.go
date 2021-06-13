@@ -1,6 +1,9 @@
 package websocket
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"io"
+)
 
 type Frame struct {
 	IsFragment bool
@@ -52,7 +55,7 @@ func (ws *Websocket) Receive() (Frame, error) {
 		return frame, nil
 	}
 
-	for i := 0; i < len(payload); i++ {
+	for i := uint64(0); i < uint64(len(payload)); i++ {
 		payload[i] ^= maskKey[i%4]
 	}
 	frame.Payload = payload
@@ -62,8 +65,9 @@ func (ws *Websocket) Receive() (Frame, error) {
 
 func (ws *Websocket) read(size uint64) ([]byte, error) {
 	buff := make([]byte, size)
-	if _, err := ws.buff.Read(buff); err != nil {
+	if _, err := io.ReadFull(ws.rw, buff); err != nil {
 		return nil, err
 	}
+
 	return buff, nil
 }

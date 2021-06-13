@@ -20,7 +20,7 @@ var rawRespTemplate = "HTTP/1.1 101 Switching Protocols\n" +
 
 type Websocket struct {
 	conn    net.Conn
-	buff    *bufio.ReadWriter
+	rw      *bufio.ReadWriter
 	headers http.Header
 }
 
@@ -30,14 +30,14 @@ func NewWebsocket(w http.ResponseWriter, req *http.Request) (*Websocket, error) 
 		return nil, errors.New("can't get control over tcp connection")
 	}
 
-	conn, buff, err := hj.Hijack()
+	conn, rw, err := hj.Hijack()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Websocket{
 		conn:    conn,
-		buff:    buff,
+		rw:      rw,
 		headers: req.Header,
 	}, nil
 }
