@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/Mort4lis/ws-echo-server/internal/websocket"
 	"log"
 	"net/http"
@@ -22,5 +23,12 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 		log.Println(err)
 	}
 
-	log.Printf("%s", frame.Payload)
+	respBody := []byte(fmt.Sprintf("%s from Go echo server", frame.Payload))
+	if err = ws.Send(websocket.Frame{
+		Reserved: frame.Reserved,
+		Opcode:   frame.Opcode,
+		Payload:  respBody,
+	}); err != nil {
+		log.Println(err)
+	}
 }

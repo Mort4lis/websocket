@@ -71,3 +71,45 @@ func (ws *Websocket) read(size uint64) ([]byte, error) {
 
 	return buff, nil
 }
+
+func (ws *Websocket) Send(frame Frame) error {
+	data := make([]byte, 2)
+
+	data[0] = frame.Opcode
+	if !frame.IsFragment {
+		data[0] |= 0x80
+	}
+
+	var length uint64
+	if frame.Length != 0 {
+		length = frame.Length
+	} else {
+		length = uint64(len(frame.Payload))
+	}
+
+	if length <= 125 {
+		data[1] = byte(length)
+	} else if length <= (1<<16)-1 {
+		data[1] = 126
+
+		lenBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(lenBytes, uint16(length))
+		data = append(data, lenBytes...)
+	} else {
+		data[1] = 127
+
+		lenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(lenBytes, length)
+		data = append(data, lenBytes...)
+	}
+
+	data = append(data, frame.Payload...)
+	return ws.write(data)
+}
+
+func (ws *Websocket) write(data []byte) error {
+	if _, err := ws.rw.Write(data); err != nil {
+		return err
+	}
+	return ws.rw.Flush()
+}
