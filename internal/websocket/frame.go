@@ -6,11 +6,13 @@ import (
 )
 
 const (
-	TextOpcode      = 0x01
-	BinaryOpcode    = 0x02
-	ConnCloseOpcode = 0x08
-	PingOpcode      = 0x09
-	PongOpcode      = 0xA
+	TextOpcode   = 0x01
+	BinaryOpcode = 0x02
+	CloseOpcode  = 0x08
+	PingOpcode   = 0x09
+	PongOpcode   = 0xA
+
+	normalClose = 1000
 
 	maxInt8Value   = (1 << 7) - 1
 	maxUint16Value = (1 << 16) - 1
@@ -126,9 +128,15 @@ func (ws *Websocket) write(data []byte) error {
 }
 
 func (ws *Websocket) Close() error {
+	return ws.close(normalClose)
+}
+
+func (ws *Websocket) close(statusCode uint16) error {
+	payload := make([]byte, 2)
+	binary.BigEndian.PutUint16(payload, statusCode)
 	frame := Frame{
-		Opcode:  ConnCloseOpcode,
-		Payload: make([]byte, 2),
+		Opcode:  CloseOpcode,
+		Payload: payload,
 	}
 	if err := ws.Send(frame); err != nil {
 		return err

@@ -19,10 +19,7 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 
 	defer func() {
-		err = ws.Close()
-		if err != nil {
-			log.Println(err)
-		}
+		_ = ws.Close()
 	}()
 
 	for {
@@ -32,21 +29,16 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		resBody := frame.Payload
-		if err = ws.Send(websocket.Frame{
-			Opcode:  websocket.TextOpcode,
-			Payload: resBody,
-		}); err != nil {
-			log.Println(err)
+		switch frame.Opcode {
+		case websocket.CloseOpcode:
+			return
+		default:
+			if err = ws.Send(websocket.Frame{
+				Opcode:  frame.Opcode,
+				Payload: frame.Payload,
+			}); err != nil {
+				log.Println(err)
+			}
 		}
 	}
-
-	//respBody := []byte(fmt.Sprintf("%s from Go echo server", frame.Payload))
-	//if err = ws.Send(websocket.Frame{
-	//	Reserved: frame.Reserved,
-	//	Opcode:   frame.Opcode,
-	//	Payload:  respBody,
-	//}); err != nil {
-	//	log.Println(err)
-	//}
 }
