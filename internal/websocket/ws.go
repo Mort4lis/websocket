@@ -8,15 +8,21 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 )
 
 // GUID (Globally Unique Identifier)
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-var rawRespTemplate = "HTTP/1.1 101 Switching Protocols\n" +
-	"Upgrade: websocket\n" +
-	"Connection: Upgrade\n" +
-	"Sec-WebSocket-Accept: %s\n\n"
+var handshakeRespTemplate = strings.Join([]string{
+	"HTTP/1.1 101 Switching Protocols",
+	"Server: go/ws-custom-server",
+	"Upgrade: WebSocket",
+	"Connection: Upgrade",
+	"Sec-WebSocket-Accept: %s",
+	"", // required for extra CRLF
+	"", // required for extra CRLF
+}, "\r\n")
 
 type Websocket struct {
 	conn    net.Conn
@@ -44,13 +50,9 @@ func NewWebsocket(w http.ResponseWriter, req *http.Request) (*Websocket, error) 
 
 func (ws *Websocket) Handshake() error {
 	secret := ws.createSecret(ws.headers.Get("Sec-WebSocket-Key"))
-	rawResp := fmt.Sprintf(rawRespTemplate, secret)
+	rawResp := fmt.Sprintf(handshakeRespTemplate, secret)
 
-	_, err := ws.conn.Write([]byte(rawResp))
-	if err != nil {
-		return err
-	}
-	return nil
+	return ws.write([]byte(rawResp))
 }
 
 func (ws *Websocket) createSecret(key string) string {
