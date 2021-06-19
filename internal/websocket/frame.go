@@ -5,6 +5,17 @@ import (
 	"io"
 )
 
+const (
+	TextOpcode      = 0x01
+	BinaryOpcode    = 0x02
+	ConnCloseOpcode = 0x08
+	PingOpcode      = 0x09
+	PongOpcode      = 0xA
+
+	maxInt8Value   = (1 << 7) - 1
+	maxUint16Value = (1 << 16) - 1
+)
+
 type Frame struct {
 	IsFragment bool
 	Reserved   byte
@@ -28,14 +39,14 @@ func (ws *Websocket) Receive() (Frame, error) {
 	frame.IsMasked = (head[1] & 0x80) == 0x80
 
 	length := uint64(head[1] & 0x7F)
-	if length == 126 {
+	if length == maxInt8Value-1 {
 		lenBytes, err := ws.read(2)
 		if err != nil {
 			return frame, err
 		}
 
 		length = uint64(binary.BigEndian.Uint16(lenBytes))
-	} else if length == 127 {
+	} else if length == maxInt8Value {
 		lenBytes, err := ws.read(8)
 		if err != nil {
 			return frame, err
@@ -87,16 +98,16 @@ func (ws *Websocket) Send(frame Frame) error {
 		length = uint64(len(frame.Payload))
 	}
 
-	if length <= 125 {
+	if length <= maxInt8Value-2 {
 		data[1] = byte(length)
-	} else if length <= (1<<16)-1 {
-		data[1] = 126
+	} else if length <= maxUint16Value {
+		data[1] = maxInt8Value - 1
 
 		lenBytes := make([]byte, 2)
 		binary.BigEndian.PutUint16(lenBytes, uint16(length))
 		data = append(data, lenBytes...)
 	} else {
-		data[1] = 127
+		data[1] = maxInt8Value
 
 		lenBytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(lenBytes, length)
@@ -116,7 +127,7 @@ func (ws *Websocket) write(data []byte) error {
 
 func (ws *Websocket) Close() error {
 	frame := Frame{
-		Opcode:  0x08,
+		Opcode:  ConnCloseOpcode,
 		Payload: make([]byte, 2),
 	}
 	if err := ws.Send(frame); err != nil {
