@@ -24,4 +24,8 @@ var (
 		protocolError,
 		"reserved bits must be set at 0, when no extension defining RSV meaning has been negotiated",
 	)
+	ReservedOpcodeFrameErr = NewError(
+		protocolError,
+		"opcodes 0x03-0x07 and 0xB-0xF are reserved for further frames",
+	)
 )

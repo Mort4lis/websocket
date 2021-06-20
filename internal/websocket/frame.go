@@ -36,6 +36,9 @@ func (f Frame) validate() error {
 	if f.Reserved > 0 {
 		return NonZeroRSVFrameErr
 	}
+	if f.Opcode > BinaryOpcode && f.Opcode < CloseOpcode || f.Opcode > PongOpcode {
+		return ReservedOpcodeFrameErr
+	}
 
 	return nil
 }
