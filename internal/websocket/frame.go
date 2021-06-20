@@ -33,6 +33,9 @@ func (f Frame) validate() error {
 	if f.IsControl() && (f.Length > maxInt8Value-2 || f.IsFragment) {
 		return ControlFrameErr
 	}
+	if f.Reserved > 0 {
+		return NonZeroRSVFrameErr
+	}
 
 	return nil
 }

@@ -20,4 +20,8 @@ var (
 		protocolError,
 		"all control frames must have a payload length of 125 bytes or less and must not be fragmented",
 	)
+	NonZeroRSVFrameErr = NewError(
+		protocolError,
+		"reserved bits must be set at 0, when no extension defining RSV meaning has been negotiated",
+	)
 )
