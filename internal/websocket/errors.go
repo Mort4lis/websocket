@@ -2,30 +2,43 @@ package websocket
 
 import "fmt"
 
-type Error struct {
-	statusCode  uint16
-	description string
+type CloseError struct {
+	code int
+	text string
 }
 
-func NewError(statusCode uint16, description string) Error {
-	return Error{statusCode, description}
+func NewCloseError(code int, text string) CloseError {
+	return CloseError{code, text}
 }
 
-func (e Error) Error() string {
-	return fmt.Sprintf("%d: %s", e.statusCode, e.description)
+func IsCloseError(err error) bool {
+	_, ok := err.(CloseError)
+	return ok
+}
+
+func (e CloseError) Error() string {
+	return fmt.Sprintf("%d: %s", e.code, e.text)
 }
 
 var (
-	ControlFrameErr = NewError(
+	errInvalidControlFrame = NewCloseError(
 		protocolError,
 		"all control frames must have a payload length of 125 bytes or less and must not be fragmented",
 	)
-	NonZeroRSVFrameErr = NewError(
+	errNonZeroRSVFrame = NewCloseError(
 		protocolError,
 		"reserved bits must be set at 0, when no extension defining RSV meaning has been negotiated",
 	)
-	ReservedOpcodeFrameErr = NewError(
+	errReservedOpcodeFrame = NewCloseError(
 		protocolError,
 		"opcodes 0x03-0x07 and 0xB-0xF are reserved for further frames",
+	)
+	errInvalidContinuationFrame = NewCloseError(
+		protocolError,
+		"the fragmented frame after initial frame doesn't have continuation opcode",
+	)
+	errEmptyContinueFrames = NewCloseError(
+		protocolError,
+		"there is no frames to continue",
 	)
 )

@@ -18,8 +18,9 @@ const (
 	GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 	// Status codes
-	normalClose   = 1000
-	protocolError = 1002
+	normalClose      = 1000
+	protocolError    = 1002
+	noStatusReceived = 1005
 
 	maxInt8Value   = (1 << 7) - 1
 	maxUint16Value = (1 << 16) - 1
@@ -36,9 +37,10 @@ var handshakeRespTemplate = strings.Join([]string{
 }, "\r\n")
 
 type Websocket struct {
-	conn    net.Conn
-	rw      *bufio.ReadWriter
-	headers http.Header
+	conn       net.Conn
+	rw         *bufio.ReadWriter
+	headers    http.Header
+	fragFrames []Frame
 }
 
 func NewWebsocket(w http.ResponseWriter, req *http.Request) (*Websocket, error) {
@@ -74,6 +76,63 @@ func (ws *Websocket) createSecret(key string) string {
 }
 
 func (ws *Websocket) Receive() (Frame, error) {
+	defer func() {
+		if len(ws.fragFrames) != 0 {
+			ws.fragFrames = nil
+		}
+	}()
+
+	for {
+		frame, err := ws.receive()
+		if err != nil {
+			if IsCloseError(err) {
+				closeCode := err.(CloseError).code
+				err = ws.close(closeCode)
+			}
+
+			return frame, err
+		}
+
+		switch frame.Opcode {
+		case CloseOpcode:
+			closeCode := noStatusReceived
+			if len(frame.Payload) >= 2 {
+				closeCode = int(binary.BigEndian.Uint16(frame.Payload))
+			}
+
+			err = ws.close(closeCode)
+			if err != nil {
+				return frame, nil
+			}
+			return frame, CloseError{code: closeCode, text: ""}
+		case PingOpcode:
+			frame.Opcode = PongOpcode
+			err = ws.Send(frame)
+			if err != nil {
+				return frame, nil
+			}
+
+			continue
+		case ContinuationOpcode, TextOpcode, BinaryOpcode:
+			ws.fragFrames = append(ws.fragFrames, frame)
+			if frame.IsFragment {
+				continue
+			}
+
+			var payload []byte
+			for _, fr := range ws.fragFrames {
+				payload = append(payload, fr.Payload...)
+			}
+
+			return Frame{
+				Opcode:  ws.fragFrames[0].Opcode,
+				Payload: payload,
+			}, nil
+		}
+	}
+}
+
+func (ws *Websocket) receive() (Frame, error) {
 	frame := Frame{}
 
 	head, err := ws.read(2)
@@ -118,7 +177,7 @@ func (ws *Websocket) Receive() (Frame, error) {
 		payload[i] ^= maskKey[i%4]
 	}
 	frame.Payload = payload
-	return frame, frame.validate()
+	return frame, ws.validate(frame)
 }
 
 func (ws *Websocket) read(size uint64) ([]byte, error) {
@@ -130,6 +189,21 @@ func (ws *Websocket) read(size uint64) ([]byte, error) {
 	return buff, nil
 }
 
+func (ws *Websocket) validate(frame Frame) error {
+	err := frame.validate()
+	if err != nil {
+		return err
+	}
+
+	if (frame.IsText() || frame.IsBinary()) && len(ws.fragFrames) != 0 {
+		return errInvalidContinuationFrame
+	}
+	if frame.IsContinuation() && len(ws.fragFrames) == 0 {
+		return errEmptyContinueFrames
+	}
+	return nil
+}
+
 func (ws *Websocket) Send(frame Frame) error {
 	data := make([]byte, 2)
 
@@ -138,13 +212,7 @@ func (ws *Websocket) Send(frame Frame) error {
 		data[0] |= 0x80
 	}
 
-	var length uint64
-	if frame.Length != 0 {
-		length = frame.Length
-	} else {
-		length = uint64(len(frame.Payload))
-	}
-
+	length := uint64(len(frame.Payload))
 	if length <= maxInt8Value-2 {
 		data[1] = byte(length)
 	} else if length <= maxUint16Value {
@@ -176,13 +244,9 @@ func (ws *Websocket) Close() error {
 	return ws.close(normalClose)
 }
 
-func (ws *Websocket) CloseWithError(err Error) error {
-	return ws.close(err.statusCode)
-}
-
-func (ws *Websocket) close(statusCode uint16) error {
+func (ws *Websocket) close(statusCode int) error {
 	payload := make([]byte, 2)
-	binary.BigEndian.PutUint16(payload, statusCode)
+	binary.BigEndian.PutUint16(payload, uint16(statusCode))
 	frame := Frame{
 		Opcode:  CloseOpcode,
 		Payload: payload,
