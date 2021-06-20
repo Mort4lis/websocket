@@ -18,7 +18,8 @@ const (
 	GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 	// Status codes
-	normalClose = 1000
+	normalClose   = 1000
+	protocolError = 1002
 
 	maxInt8Value   = (1 << 7) - 1
 	maxUint16Value = (1 << 16) - 1
@@ -117,8 +118,7 @@ func (ws *Websocket) Receive() (Frame, error) {
 		payload[i] ^= maskKey[i%4]
 	}
 	frame.Payload = payload
-
-	return frame, nil
+	return frame, frame.validate()
 }
 
 func (ws *Websocket) read(size uint64) ([]byte, error) {
@@ -174,6 +174,10 @@ func (ws *Websocket) write(data []byte) error {
 
 func (ws *Websocket) Close() error {
 	return ws.close(normalClose)
+}
+
+func (ws *Websocket) CloseWithError(err Error) error {
+	return ws.close(err.statusCode)
 }
 
 func (ws *Websocket) close(statusCode uint16) error {
