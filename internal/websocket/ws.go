@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -21,6 +22,7 @@ const (
 	normalClose      = 1000
 	protocolError    = 1002
 	noStatusReceived = 1005
+	invalidPayload   = 1007
 
 	maxInt8Value   = (1 << 7) - 1
 	maxUint16Value = (1 << 16) - 1
@@ -75,7 +77,13 @@ func (ws *Websocket) createSecret(key string) string {
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
 }
 
-func (ws *Websocket) Receive() (Frame, error) {
+func (ws *Websocket) Receive() (frame Frame, err error) {
+	defer func() {
+		if err != nil && IsCloseError(err) {
+			closeCode := err.(CloseError).code
+			_ = ws.close(closeCode)
+		}
+	}()
 	defer func() {
 		if len(ws.fragFrames) != 0 {
 			ws.fragFrames = nil
@@ -83,14 +91,9 @@ func (ws *Websocket) Receive() (Frame, error) {
 	}()
 
 	for {
-		frame, err := ws.receive()
+		frame, err = ws.receive()
 		if err != nil {
-			if IsCloseError(err) {
-				closeCode := err.(CloseError).code
-				err = ws.close(closeCode)
-			}
-
-			return frame, err
+			return
 		}
 
 		switch frame.Opcode {
@@ -102,17 +105,15 @@ func (ws *Websocket) Receive() (Frame, error) {
 
 			err = ws.close(closeCode)
 			if err != nil {
-				return frame, err
+				return
 			}
 			return frame, CloseError{code: closeCode, text: ""}
 		case PingOpcode:
 			frame.Opcode = PongOpcode
 			err = ws.Send(frame)
 			if err != nil {
-				return frame, err
+				return
 			}
-
-			continue
 		case ContinuationOpcode, TextOpcode, BinaryOpcode:
 			ws.fragFrames = append(ws.fragFrames, frame)
 			if frame.IsFragment {
@@ -124,10 +125,15 @@ func (ws *Websocket) Receive() (Frame, error) {
 				payload = append(payload, fr.Payload...)
 			}
 
-			return Frame{
+			frame = Frame{
 				Opcode:  ws.fragFrames[0].Opcode,
 				Payload: payload,
-			}, nil
+			}
+
+			if frame.IsText() && !utf8.Valid(frame.Payload) {
+				return frame, errInvalidUtf8Payload
+			}
+			return
 		}
 	}
 }

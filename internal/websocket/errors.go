@@ -41,4 +41,8 @@ var (
 		protocolError,
 		"there is no frames to continue",
 	)
+	errInvalidUtf8Payload = NewCloseError(
+		invalidPayload,
+		"invalid UTF-8 text payload",
+	)
 )
