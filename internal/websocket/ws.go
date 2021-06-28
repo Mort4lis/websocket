@@ -102,14 +102,14 @@ func (ws *Websocket) Receive() (Frame, error) {
 
 			err = ws.close(closeCode)
 			if err != nil {
-				return frame, nil
+				return frame, err
 			}
 			return frame, CloseError{code: closeCode, text: ""}
 		case PingOpcode:
 			frame.Opcode = PongOpcode
 			err = ws.Send(frame)
 			if err != nil {
-				return frame, nil
+				return frame, err
 			}
 
 			continue
@@ -165,12 +165,12 @@ func (ws *Websocket) receive() (Frame, error) {
 
 	maskKey, err := ws.read(4)
 	if err != nil {
-		return frame, nil
+		return frame, err
 	}
 
 	payload, err := ws.read(length)
 	if err != nil {
-		return frame, nil
+		return frame, err
 	}
 
 	for i := uint64(0); i < uint64(len(payload)); i++ {
