@@ -14,19 +14,52 @@ import (
 	"unicode/utf8"
 )
 
+// GUID (Globally Unique Identifier)
+const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
 const (
-	// GUID (Globally Unique Identifier)
-	GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
-	// Status codes
-	normalClose      = 1000
-	protocolError    = 1002
-	noStatusReceived = 1005
-	invalidPayload   = 1007
-
 	maxInt8Value   = (1 << 7) - 1
 	maxUint16Value = (1 << 16) - 1
 )
+
+// Close codes defined in RFC 6455
+const (
+	CloseNormalClosure           = 1000
+	CloseGoingAway               = 1001
+	CloseProtocolError           = 1002
+	CloseUnsupportedData         = 1003
+	CloseNoStatusReceived        = 1005
+	CloseAbnormalClosure         = 1006
+	CloseInvalidFramePayloadData = 1007
+	ClosePolicyViolation         = 1008
+	CloseMessageTooBig           = 1009
+	CloseMandatoryExtension      = 1010
+	CloseInternalServerErr       = 1011
+	CloseServiceRestart          = 1012
+	CloseTryAgainLater           = 1013
+	CloseTLSHandshake            = 1015
+)
+
+var validReceivedCloseCodes = map[int]bool{
+	CloseNormalClosure:           true,
+	CloseGoingAway:               true,
+	CloseProtocolError:           true,
+	CloseUnsupportedData:         true,
+	CloseNoStatusReceived:        false,
+	CloseAbnormalClosure:         false,
+	CloseInvalidFramePayloadData: true,
+	ClosePolicyViolation:         true,
+	CloseMessageTooBig:           true,
+	CloseMandatoryExtension:      true,
+	CloseInternalServerErr:       true,
+	CloseServiceRestart:          true,
+	CloseTryAgainLater:           true,
+	CloseTLSHandshake:            false,
+}
+
+func IsValidReceivedCloseCode(code int) bool {
+	return validReceivedCloseCodes[code] || (code >= 3000 && code <= 4999)
+}
 
 var handshakeRespTemplate = strings.Join([]string{
 	"HTTP/1.1 101 Switching Protocols",
@@ -98,16 +131,16 @@ func (ws *Websocket) Receive() (frame Frame, err error) {
 
 		switch frame.Opcode {
 		case CloseOpcode:
-			closeCode := noStatusReceived
+			closeCode := CloseNormalClosure
 			if len(frame.Payload) >= 2 {
-				closeCode = int(binary.BigEndian.Uint16(frame.Payload))
+				closeCode = int(binary.BigEndian.Uint16(frame.Payload[:2]))
 			}
 
 			err = ws.close(closeCode)
 			if err != nil {
 				return
 			}
-			return frame, CloseError{code: closeCode, text: ""}
+			return frame, CloseError{code: closeCode}
 		case PingOpcode:
 			frame.Opcode = PongOpcode
 			err = ws.Send(frame)
@@ -247,7 +280,7 @@ func (ws *Websocket) write(data []byte) error {
 }
 
 func (ws *Websocket) Close() error {
-	return ws.close(normalClose)
+	return ws.close(CloseNormalClosure)
 }
 
 func (ws *Websocket) close(statusCode int) error {

@@ -22,27 +22,35 @@ func (e CloseError) Error() string {
 
 var (
 	errInvalidControlFrame = NewCloseError(
-		protocolError,
+		CloseProtocolError,
 		"all control frames must have a payload length of 125 bytes or less and must not be fragmented",
 	)
 	errNonZeroRSVFrame = NewCloseError(
-		protocolError,
+		CloseProtocolError,
 		"reserved bits must be set at 0, when no extension defining RSV meaning has been negotiated",
 	)
 	errReservedOpcodeFrame = NewCloseError(
-		protocolError,
+		CloseProtocolError,
 		"opcodes 0x03-0x07 and 0xB-0xF are reserved for further frames",
 	)
 	errInvalidContinuationFrame = NewCloseError(
-		protocolError,
+		CloseProtocolError,
 		"the fragmented frame after initial frame doesn't have continuation opcode",
 	)
 	errEmptyContinueFrames = NewCloseError(
-		protocolError,
+		CloseProtocolError,
 		"there is no frames to continue",
 	)
+	errInvalidClosurePayload = NewCloseError(
+		CloseProtocolError,
+		"invalid close payload",
+	)
+	errInvalidClosureCode = NewCloseError(
+		CloseProtocolError,
+		"invalid closure code",
+	)
 	errInvalidUtf8Payload = NewCloseError(
-		invalidPayload,
+		CloseInvalidFramePayloadData,
 		"invalid UTF-8 text payload",
 	)
 )
