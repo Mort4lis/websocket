@@ -2,20 +2,11 @@ package websocket
 
 import (
 	"bufio"
-	"crypto/sha1"
-	"encoding/base64"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"io"
 	"net"
-	"net/http"
-	"strings"
 	"unicode/utf8"
 )
-
-// GUID (Globally Unique Identifier)
-const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 const (
 	maxInt8Value   = (1 << 7) - 1
@@ -61,56 +52,13 @@ func IsValidReceivedCloseCode(code int) bool {
 	return validReceivedCloseCodes[code] || (code >= 3000 && code <= 4999)
 }
 
-var handshakeRespTemplate = strings.Join([]string{
-	"HTTP/1.1 101 Switching Protocols",
-	"Server: go/ws-custom-server",
-	"Upgrade: WebSocket",
-	"Connection: Upgrade",
-	"Sec-WebSocket-Accept: %s",
-	"", // required for extra CRLF
-	"", // required for extra CRLF
-}, "\r\n")
-
-type Websocket struct {
+type Conn struct {
 	conn       net.Conn
 	rw         *bufio.ReadWriter
-	headers    http.Header
 	fragFrames []Frame
 }
 
-func NewWebsocket(w http.ResponseWriter, req *http.Request) (*Websocket, error) {
-	hj, ok := w.(http.Hijacker)
-	if !ok {
-		return nil, errors.New("can't get control over tcp connection")
-	}
-
-	conn, rw, err := hj.Hijack()
-	if err != nil {
-		return nil, err
-	}
-
-	return &Websocket{
-		conn:    conn,
-		rw:      rw,
-		headers: req.Header,
-	}, nil
-}
-
-func (ws *Websocket) Handshake() error {
-	secret := ws.createSecret(ws.headers.Get("Sec-WebSocket-Key"))
-	rawResp := fmt.Sprintf(handshakeRespTemplate, secret)
-
-	return ws.write([]byte(rawResp))
-}
-
-func (ws *Websocket) createSecret(key string) string {
-	hash := sha1.New()
-	hash.Write([]byte(key))
-	hash.Write([]byte(GUID))
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-}
-
-func (ws *Websocket) Receive() (frame Frame, err error) {
+func (ws *Conn) Receive() (frame Frame, err error) {
 	defer func() {
 		if err != nil && IsCloseError(err) {
 			closeCode := err.(CloseError).code
@@ -171,7 +119,7 @@ func (ws *Websocket) Receive() (frame Frame, err error) {
 	}
 }
 
-func (ws *Websocket) receive() (Frame, error) {
+func (ws *Conn) receive() (Frame, error) {
 	frame := Frame{}
 
 	head, err := ws.read(2)
@@ -219,7 +167,7 @@ func (ws *Websocket) receive() (Frame, error) {
 	return frame, ws.validate(frame)
 }
 
-func (ws *Websocket) read(size uint64) ([]byte, error) {
+func (ws *Conn) read(size uint64) ([]byte, error) {
 	buff := make([]byte, size)
 	if _, err := io.ReadFull(ws.rw, buff); err != nil {
 		return nil, err
@@ -228,7 +176,7 @@ func (ws *Websocket) read(size uint64) ([]byte, error) {
 	return buff, nil
 }
 
-func (ws *Websocket) validate(frame Frame) error {
+func (ws *Conn) validate(frame Frame) error {
 	err := frame.validate()
 	if err != nil {
 		return err
@@ -243,7 +191,7 @@ func (ws *Websocket) validate(frame Frame) error {
 	return nil
 }
 
-func (ws *Websocket) Send(frame Frame) error {
+func (ws *Conn) Send(frame Frame) error {
 	data := make([]byte, 2)
 
 	data[0] = frame.Opcode
@@ -272,18 +220,18 @@ func (ws *Websocket) Send(frame Frame) error {
 	return ws.write(data)
 }
 
-func (ws *Websocket) write(data []byte) error {
+func (ws *Conn) write(data []byte) error {
 	if _, err := ws.rw.Write(data); err != nil {
 		return err
 	}
 	return ws.rw.Flush()
 }
 
-func (ws *Websocket) Close() error {
+func (ws *Conn) Close() error {
 	return ws.close(CloseNormalClosure)
 }
 
-func (ws *Websocket) close(statusCode int) error {
+func (ws *Conn) close(statusCode int) error {
 	payload := make([]byte, 2)
 	binary.BigEndian.PutUint16(payload, uint16(statusCode))
 	frame := Frame{
