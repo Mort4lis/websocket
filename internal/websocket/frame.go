@@ -44,7 +44,7 @@ func (f Frame) IsControl() bool {
 }
 
 func (f Frame) validate() error {
-	if f.IsControl() && (f.Length > maxInt8Value-2 || f.IsFragment) {
+	if f.IsControl() && (f.Length > 125 || f.IsFragment) {
 		return errInvalidControlFrame
 	}
 	if f.Reserved > 0 {
