@@ -61,7 +61,7 @@ type Conn struct {
 func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 	if c.reader != nil {
 		_, err = ioutil.ReadAll(c.reader)
-		if err != nil && err != io.EOF {
+		if err != nil {
 			return noFrame, nil, err
 		}
 
