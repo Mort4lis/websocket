@@ -7,9 +7,6 @@ import (
 )
 
 func initWebsocket(w http.ResponseWriter, req *http.Request) {
-	var err error
-	var frame websocket.Frame
-
 	conn, err := websocket.Upgrade(w, req)
 	if err != nil {
 		return
@@ -20,15 +17,15 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 	}()
 
 	for {
-		frame, err = conn.Receive()
+		typ, payload, err := conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
 			return
 		}
 
 		if err = conn.Send(websocket.Frame{
-			Opcode:  frame.Opcode,
-			Payload: frame.Payload,
+			Opcode:  typ,
+			Payload: payload,
 		}); err != nil {
 			log.Println(err)
 			return

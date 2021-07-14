@@ -1,6 +1,7 @@
 package websocket
 
 const (
+	noFrame            = 0xff
 	ContinuationOpcode = 0x00
 	TextOpcode         = 0x01
 	BinaryOpcode       = 0x02

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"io"
+	"io/ioutil"
 	"net"
 	"unicode/utf8"
 )
@@ -48,68 +49,97 @@ func IsValidReceivedCloseCode(code int) bool {
 }
 
 type Conn struct {
-	conn       net.Conn
-	rw         *bufio.ReadWriter
-	closeErr   *CloseError
-	fragFrames []Frame
+	conn net.Conn
+	rw   *bufio.ReadWriter
+
+	reader io.Reader
+	writer io.Writer
+
+	closeErr *CloseError
+}
+
+func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
+	if c.reader != nil {
+		_, err = ioutil.ReadAll(c.reader)
+		if err != nil && err != io.EOF {
+			return noFrame, nil, err
+		}
+
+		c.reader = nil
+	}
+
+	for c.closeErr == nil {
+		fr, err := c.Receive()
+		if err != nil {
+			return noFrame, nil, err
+		}
+
+		if fr.IsText() || fr.IsBinary() {
+			c.reader = &messageReader{
+				conn:   c,
+				typ:    fr.Opcode,
+				buff:   fr.Payload,
+				isLast: !fr.IsFragment,
+			}
+			return fr.Opcode, c.reader, nil
+		}
+	}
+
+	return noFrame, nil, c.closeErr
+}
+
+func (c *Conn) ReadMessage() (messageType byte, payload []byte, err error) {
+	frameType, r, err := c.NextReader()
+	if err != nil {
+		return noFrame, nil, err
+	}
+
+	payload, err = ioutil.ReadAll(r)
+	if err != nil {
+		return noFrame, nil, err
+	}
+
+	return frameType, payload, nil
 }
 
 func (c *Conn) Receive() (Frame, error) {
-	defer func() {
-		if len(c.fragFrames) != 0 {
-			c.fragFrames = nil
-		}
-	}()
+	fr, err := c.receive()
+	if err != nil {
+		return fr, err
+	}
 
-	for {
-		fr, err := c.receive()
+	switch fr.Opcode {
+	case CloseOpcode:
+		closeCode := CloseNormalClosure
+		if len(fr.Payload) >= 2 {
+			closeCode = int(binary.BigEndian.Uint16(fr.Payload[:2]))
+		}
+
+		err = c.close(closeCode)
 		if err != nil {
 			return fr, err
 		}
 
-		switch fr.Opcode {
-		case CloseOpcode:
-			closeCode := CloseNormalClosure
-			if len(fr.Payload) >= 2 {
-				closeCode = int(binary.BigEndian.Uint16(fr.Payload[:2]))
-			}
-
-			err = c.close(closeCode)
-			if err != nil {
-				return fr, err
-			}
-
-			c.closeErr = &CloseError{code: closeCode}
-			return fr, c.closeErr
-		case PingOpcode:
-			fr.Opcode = PongOpcode
-			err = c.Send(fr)
-			if err != nil {
-				return fr, err
-			}
-		case ContinuationOpcode, TextOpcode, BinaryOpcode:
-			c.fragFrames = append(c.fragFrames, fr)
-			if fr.IsFragment {
-				continue
-			}
-
-			var payload []byte
-			for _, fr = range c.fragFrames {
-				payload = append(payload, fr.Payload...)
-			}
-
-			fr = Frame{
-				Opcode:  c.fragFrames[0].Opcode,
-				Payload: payload,
-			}
-
-			if fr.IsText() && !utf8.Valid(fr.Payload) {
-				c.closeErr = errInvalidUtf8Payload
-				return fr, c.closeErr
-			}
-			return fr, nil
+		c.closeErr = &CloseError{code: closeCode}
+		return fr, c.closeErr
+	case PingOpcode:
+		pongFr := fr
+		pongFr.Opcode = PongOpcode
+		err = c.Send(pongFr)
+		if err != nil {
+			return fr, err
+		}
+	case ContinuationOpcode:
+		if c.reader == nil {
+			return fr, c.setCloseError(errEmptyContinueFrames)
+		}
+	case TextOpcode, BinaryOpcode:
+		if c.reader != nil {
+			return fr, c.setCloseError(errInvalidContinuationFrame)
 		}
 	}
+
+	return fr, nil
 }
 
 func (c *Conn) receive() (Frame, error) {
@@ -201,12 +231,7 @@ func (c *Conn) validate(fr Frame) *CloseError {
 			return errInvalidClosurePayload
 		}
 	}
-	if (fr.IsText() || fr.IsBinary()) && len(c.fragFrames) != 0 {
-		return errInvalidContinuationFrame
-	}
-	if fr.IsContinuation() && len(c.fragFrames) == 0 {
-		return errEmptyContinueFrames
-	}
+
 	return nil
 }
 
@@ -245,6 +270,11 @@ func (c *Conn) write(data []byte) error {
 		return err
 	}
 	return c.rw.Flush()
+}
+
+func (c *Conn) setCloseError(err *CloseError) error {
+	c.closeErr = err
+	return err
 }
 
 func (c *Conn) Close() error {
