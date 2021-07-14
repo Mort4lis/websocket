@@ -7,16 +7,16 @@ type CloseError struct {
 	text string
 }
 
-func NewCloseError(code int, text string) CloseError {
-	return CloseError{code, text}
+func NewCloseError(code int, text string) *CloseError {
+	return &CloseError{code, text}
 }
 
 func IsCloseError(err error) bool {
-	_, ok := err.(CloseError)
+	_, ok := err.(*CloseError)
 	return ok
 }
 
-func (e CloseError) Error() string {
+func (e *CloseError) Error() string {
 	return fmt.Sprintf("%d: %s", e.code, e.text)
 }
 

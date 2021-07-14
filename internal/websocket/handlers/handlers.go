@@ -16,9 +16,7 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 
 	defer func() {
-		if err == nil || !websocket.IsCloseError(err) {
-			_ = conn.Close()
-		}
+		_ = conn.Close()
 	}()
 
 	for {

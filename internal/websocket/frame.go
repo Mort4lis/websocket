@@ -1,10 +1,5 @@
 package websocket
 
-import (
-	"encoding/binary"
-	"unicode/utf8"
-)
-
 const (
 	ContinuationOpcode = 0x00
 	TextOpcode         = 0x01
@@ -41,32 +36,4 @@ func (f Frame) IsClose() bool {
 
 func (f Frame) IsControl() bool {
 	return f.Opcode == CloseOpcode || f.Opcode == PingOpcode || f.Opcode == PongOpcode
-}
-
-func (f Frame) validate() error {
-	if f.IsControl() && (f.Length > 125 || f.IsFragment) {
-		return errInvalidControlFrame
-	}
-	if f.Reserved > 0 {
-		return errNonZeroRSVFrame
-	}
-	if f.Opcode > BinaryOpcode && f.Opcode < CloseOpcode || f.Opcode > PongOpcode {
-		return errReservedOpcodeFrame
-	}
-	if f.IsClose() {
-		if len(f.Payload) >= 2 {
-			code := int(binary.BigEndian.Uint16(f.Payload[:2]))
-			reason := f.Payload[2:]
-			if !IsValidReceivedCloseCode(code) {
-				return errInvalidClosureCode
-			}
-			if !utf8.Valid(reason) {
-				return errInvalidUtf8Payload
-			}
-		} else if len(f.Payload) != 0 {
-			return errInvalidClosurePayload
-		}
-	}
-
-	return nil
 }
