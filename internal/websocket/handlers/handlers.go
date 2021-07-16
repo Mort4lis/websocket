@@ -23,10 +23,7 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if err = conn.Send(websocket.Frame{
-			Opcode:  typ,
-			Payload: payload,
-		}); err != nil {
+		if err = conn.WriteMessage(typ, payload); err != nil {
 			log.Println(err)
 			return
 		}

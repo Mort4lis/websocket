@@ -53,7 +53,7 @@ type Conn struct {
 	rw   *bufio.ReadWriter
 
 	reader io.Reader
-	writer io.Writer
+	writer io.WriteCloser
 
 	closeErr *CloseError
 }
@@ -224,6 +224,38 @@ func (c *Conn) validate(fr Frame) *CloseError {
 	}
 
 	return nil
+}
+
+func (c *Conn) NextWriter(messageType byte) (io.WriteCloser, error) {
+	if c.closeErr != nil {
+		return nil, c.closeErr
+	}
+
+	if c.writer != nil {
+		err := c.writer.Close()
+		if err != nil {
+			return nil, err
+		}
+
+		c.writer = nil
+	}
+
+	c.writer = newMessageWriter(c, messageType)
+	return c.writer, nil
+}
+
+func (c *Conn) WriteMessage(messageType byte, payload []byte) error {
+	w, err := c.NextWriter(messageType)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(payload)
+	if err != nil {
+		return err
+	}
+
+	return w.Close()
 }
 
 func (c *Conn) Send(fr Frame) error {
