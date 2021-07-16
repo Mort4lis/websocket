@@ -4,7 +4,7 @@ const defaultWriteBufferSize = 4096
 
 type messageWriter struct {
 	conn        *Conn
-	frameType   byte
+	messageType byte
 	wasFragment bool
 
 	pos  int
@@ -13,9 +13,9 @@ type messageWriter struct {
 
 func newMessageWriter(conn *Conn, frameType byte) *messageWriter {
 	return &messageWriter{
-		conn:      conn,
-		frameType: frameType,
-		buff:      make([]byte, defaultWriteBufferSize),
+		conn:        conn,
+		messageType: frameType,
+		buff:        make([]byte, defaultWriteBufferSize),
 	}
 }
 
@@ -27,13 +27,13 @@ func (w *messageWriter) Write(p []byte) (int, error) {
 	n := 0
 	for len(p) > 0 {
 		if len(w.buff[w.pos:]) == 0 {
-			fr := Frame{
-				IsFragment: true,
-				Opcode:     w.getOpcode(),
-				Payload:    w.buff,
+			fr := frame{
+				isFragment: true,
+				opcode:     w.getOpcode(),
+				payload:    w.buff,
 			}
 
-			err := w.conn.Send(fr)
+			err := w.conn.send(fr)
 			if err != nil {
 				return 0, err
 			}
@@ -56,7 +56,7 @@ func (w *messageWriter) getOpcode() byte {
 	if w.wasFragment {
 		return ContinuationOpcode
 	}
-	return w.frameType
+	return w.messageType
 }
 
 func (w *messageWriter) Close() error {
@@ -64,12 +64,12 @@ func (w *messageWriter) Close() error {
 		return w.conn.closeErr
 	}
 
-	fr := Frame{
-		Opcode:  w.getOpcode(),
-		Payload: w.buff[:w.pos],
+	fr := frame{
+		opcode:  w.getOpcode(),
+		payload: w.buff[:w.pos],
 	}
 
-	err := w.conn.Send(fr)
+	err := w.conn.send(fr)
 	if err != nil {
 		return err
 	}

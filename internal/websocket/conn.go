@@ -75,13 +75,8 @@ func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 		}
 
 		if fr.IsText() || fr.IsBinary() {
-			c.reader = &messageReader{
-				conn:   c,
-				typ:    fr.Opcode,
-				buff:   fr.Payload,
-				isLast: !fr.IsFragment,
-			}
-			return fr.Opcode, c.reader, nil
+			c.reader = newMessageReader(c, fr.opcode, fr.payload, !fr.isFragment)
+			return fr.opcode, c.reader, nil
 		}
 	}
 
@@ -102,18 +97,18 @@ func (c *Conn) ReadMessage() (messageType byte, payload []byte, err error) {
 	return frameType, payload, nil
 }
 
-func (c *Conn) receive() (Frame, error) {
-	fr := Frame{}
+func (c *Conn) receive() (frame, error) {
+	fr := frame{}
 
 	head, err := c.read(2)
 	if err != nil {
 		return fr, err
 	}
 
-	fr.IsFragment = (head[0] & 0x80) == 0x00
-	fr.Reserved = head[0] & 0x70
-	fr.Opcode = head[0] & 0x0F
-	fr.IsMasked = (head[1] & 0x80) == 0x80
+	fr.isFragment = (head[0] & 0x80) == 0x00
+	fr.reserved = head[0] & 0x70
+	fr.opcode = head[0] & 0x0F
+	fr.isMasked = (head[1] & 0x80) == 0x80
 
 	length := uint64(head[1] & 0x7F)
 	switch length {
@@ -132,7 +127,7 @@ func (c *Conn) receive() (Frame, error) {
 
 		length = binary.BigEndian.Uint64(lenBytes)
 	}
-	fr.Length = length
+	fr.length = length
 
 	maskKey, err := c.read(4)
 	if err != nil {
@@ -147,7 +142,7 @@ func (c *Conn) receive() (Frame, error) {
 	for i := uint64(0); i < uint64(len(payload)); i++ {
 		payload[i] ^= maskKey[i%4]
 	}
-	fr.Payload = payload
+	fr.payload = payload
 
 	closeErr := c.validate(fr)
 	if closeErr != nil {
@@ -155,11 +150,11 @@ func (c *Conn) receive() (Frame, error) {
 		return fr, closeErr
 	}
 
-	switch fr.Opcode {
+	switch fr.opcode {
 	case CloseOpcode:
 		closeCode := CloseNormalClosure
-		if len(fr.Payload) >= 2 {
-			closeCode = int(binary.BigEndian.Uint16(fr.Payload[:2]))
+		if len(fr.payload) >= 2 {
+			closeCode = int(binary.BigEndian.Uint16(fr.payload[:2]))
 		}
 
 		err = c.close(closeCode)
@@ -171,8 +166,8 @@ func (c *Conn) receive() (Frame, error) {
 		return fr, c.closeErr
 	case PingOpcode:
 		pongFr := fr
-		pongFr.Opcode = PongOpcode
-		err = c.Send(pongFr)
+		pongFr.opcode = PongOpcode
+		err = c.send(pongFr)
 		if err != nil {
 			return fr, err
 		}
@@ -198,27 +193,27 @@ func (c *Conn) read(size uint64) ([]byte, error) {
 	return buff, nil
 }
 
-func (c *Conn) validate(fr Frame) *CloseError {
-	if fr.IsControl() && (fr.Length > 125 || fr.IsFragment) {
+func (c *Conn) validate(fr frame) *CloseError {
+	if fr.IsControl() && (fr.length > 125 || fr.isFragment) {
 		return errInvalidControlFrame
 	}
-	if fr.Reserved > 0 {
+	if fr.reserved > 0 {
 		return errNonZeroRSVFrame
 	}
-	if fr.Opcode > BinaryOpcode && fr.Opcode < CloseOpcode || fr.Opcode > PongOpcode {
+	if fr.opcode > BinaryOpcode && fr.opcode < CloseOpcode || fr.opcode > PongOpcode {
 		return errReservedOpcodeFrame
 	}
 	if fr.IsClose() {
-		if len(fr.Payload) >= 2 {
-			code := int(binary.BigEndian.Uint16(fr.Payload[:2]))
-			reason := fr.Payload[2:]
+		if len(fr.payload) >= 2 {
+			code := int(binary.BigEndian.Uint16(fr.payload[:2]))
+			reason := fr.payload[2:]
 			if !IsValidReceivedCloseCode(code) {
 				return errInvalidClosureCode
 			}
 			if !utf8.Valid(reason) {
 				return errInvalidUtf8Payload
 			}
-		} else if len(fr.Payload) != 0 {
+		} else if len(fr.payload) != 0 {
 			return errInvalidClosurePayload
 		}
 	}
@@ -258,15 +253,15 @@ func (c *Conn) WriteMessage(messageType byte, payload []byte) error {
 	return w.Close()
 }
 
-func (c *Conn) Send(fr Frame) error {
+func (c *Conn) send(fr frame) error {
 	data := make([]byte, 2)
 
-	data[0] = fr.Opcode
-	if !fr.IsFragment {
+	data[0] = fr.opcode
+	if !fr.isFragment {
 		data[0] |= 0x80
 	}
 
-	length := uint64(len(fr.Payload))
+	length := uint64(len(fr.payload))
 	switch {
 	case length <= 125:
 		data[1] = byte(length)
@@ -284,7 +279,7 @@ func (c *Conn) Send(fr Frame) error {
 		data = append(data, lenBytes...)
 	}
 
-	data = append(data, fr.Payload...)
+	data = append(data, fr.payload...)
 	return c.write(data)
 }
 
@@ -311,11 +306,11 @@ func (c *Conn) Close() error {
 func (c *Conn) close(statusCode int) error {
 	payload := make([]byte, 2)
 	binary.BigEndian.PutUint16(payload, uint16(statusCode))
-	fr := Frame{
-		Opcode:  CloseOpcode,
-		Payload: payload,
+	fr := frame{
+		opcode:  CloseOpcode,
+		payload: payload,
 	}
-	if err := c.Send(fr); err != nil {
+	if err := c.send(fr); err != nil {
 		return err
 	}
 

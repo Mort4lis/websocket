@@ -10,31 +10,31 @@ const (
 	PongOpcode         = 0xA
 )
 
-type Frame struct {
-	IsFragment bool
-	Reserved   byte
-	Opcode     byte
-	IsMasked   bool
-	Length     uint64
-	Payload    []byte
+type frame struct {
+	isFragment bool
+	reserved   byte
+	opcode     byte
+	isMasked   bool
+	length     uint64
+	payload    []byte
 }
 
-func (f Frame) IsText() bool {
-	return f.Opcode == TextOpcode
+func (f frame) IsText() bool {
+	return f.opcode == TextOpcode
 }
 
-func (f Frame) IsBinary() bool {
-	return f.Opcode == BinaryOpcode
+func (f frame) IsBinary() bool {
+	return f.opcode == BinaryOpcode
 }
 
-func (f Frame) IsContinuation() bool {
-	return f.Opcode == ContinuationOpcode
+func (f frame) IsContinuation() bool {
+	return f.opcode == ContinuationOpcode
 }
 
-func (f Frame) IsClose() bool {
-	return f.Opcode == CloseOpcode
+func (f frame) IsClose() bool {
+	return f.opcode == CloseOpcode
 }
 
-func (f Frame) IsControl() bool {
-	return f.Opcode == CloseOpcode || f.Opcode == PingOpcode || f.Opcode == PongOpcode
+func (f frame) IsControl() bool {
+	return f.opcode == CloseOpcode || f.opcode == PingOpcode || f.opcode == PongOpcode
 }

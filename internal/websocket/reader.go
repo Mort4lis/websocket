@@ -6,11 +6,20 @@ import (
 )
 
 type messageReader struct {
-	conn   *Conn
-	typ    byte
-	isLast bool
-	pos    int
-	buff   []byte
+	conn        *Conn
+	messageType byte
+	isLast      bool
+	pos         int
+	buff        []byte
+}
+
+func newMessageReader(conn *Conn, messageType byte, buff []byte, isLast bool) *messageReader {
+	return &messageReader{
+		conn:        conn,
+		messageType: messageType,
+		isLast:      isLast,
+		buff:        buff,
+	}
 }
 
 func (r *messageReader) Read(p []byte) (int, error) {
@@ -19,7 +28,7 @@ func (r *messageReader) Read(p []byte) (int, error) {
 	}
 
 	if !r.isLast && len(r.buff[r.pos:]) < len(p) {
-		var fr Frame
+		var fr frame
 		var err error
 
 		for r.conn.closeErr == nil {
@@ -33,11 +42,11 @@ func (r *messageReader) Read(p []byte) (int, error) {
 			}
 		}
 
-		r.isLast = !fr.IsFragment
-		r.buff = append(r.buff, fr.Payload...)
+		r.isLast = !fr.isFragment
+		r.buff = append(r.buff, fr.payload...)
 	}
 
-	if r.isLast && r.typ == TextOpcode && !utf8.Valid(r.buff) {
+	if r.isLast && r.messageType == TextOpcode && !utf8.Valid(r.buff) {
 		return 0, r.conn.setCloseError(errInvalidUtf8Payload)
 	}
 
