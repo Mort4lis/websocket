@@ -69,7 +69,7 @@ func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 	}
 
 	for c.closeErr == nil {
-		fr, err := c.Receive()
+		fr, err := c.receive()
 		if err != nil {
 			return noFrame, nil, err
 		}
@@ -100,46 +100,6 @@ func (c *Conn) ReadMessage() (messageType byte, payload []byte, err error) {
 	}
 
 	return frameType, payload, nil
-}
-
-func (c *Conn) Receive() (Frame, error) {
-	fr, err := c.receive()
-	if err != nil {
-		return fr, err
-	}
-
-	switch fr.Opcode {
-	case CloseOpcode:
-		closeCode := CloseNormalClosure
-		if len(fr.Payload) >= 2 {
-			closeCode = int(binary.BigEndian.Uint16(fr.Payload[:2]))
-		}
-
-		err = c.close(closeCode)
-		if err != nil {
-			return fr, err
-		}
-
-		c.closeErr = &CloseError{code: closeCode}
-		return fr, c.closeErr
-	case PingOpcode:
-		pongFr := fr
-		pongFr.Opcode = PongOpcode
-		err = c.Send(pongFr)
-		if err != nil {
-			return fr, err
-		}
-	case ContinuationOpcode:
-		if c.reader == nil {
-			return fr, c.setCloseError(errEmptyContinueFrames)
-		}
-	case TextOpcode, BinaryOpcode:
-		if c.reader != nil {
-			return fr, c.setCloseError(errInvalidContinuationFrame)
-		}
-	}
-
-	return fr, nil
 }
 
 func (c *Conn) receive() (Frame, error) {
@@ -193,6 +153,37 @@ func (c *Conn) receive() (Frame, error) {
 	if closeErr != nil {
 		c.closeErr = closeErr
 		return fr, closeErr
+	}
+
+	switch fr.Opcode {
+	case CloseOpcode:
+		closeCode := CloseNormalClosure
+		if len(fr.Payload) >= 2 {
+			closeCode = int(binary.BigEndian.Uint16(fr.Payload[:2]))
+		}
+
+		err = c.close(closeCode)
+		if err != nil {
+			return fr, err
+		}
+
+		c.closeErr = &CloseError{code: closeCode}
+		return fr, c.closeErr
+	case PingOpcode:
+		pongFr := fr
+		pongFr.Opcode = PongOpcode
+		err = c.Send(pongFr)
+		if err != nil {
+			return fr, err
+		}
+	case ContinuationOpcode:
+		if c.reader == nil {
+			return fr, c.setCloseError(errEmptyContinueFrames)
+		}
+	case TextOpcode, BinaryOpcode:
+		if c.reader != nil {
+			return fr, c.setCloseError(errInvalidContinuationFrame)
+		}
 	}
 
 	return fr, nil

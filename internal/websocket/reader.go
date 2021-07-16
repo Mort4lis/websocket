@@ -23,7 +23,7 @@ func (r *messageReader) Read(p []byte) (int, error) {
 		var err error
 
 		for r.conn.closeErr == nil {
-			fr, err = r.conn.Receive()
+			fr, err = r.conn.receive()
 			if err != nil {
 				return 0, err
 			}
