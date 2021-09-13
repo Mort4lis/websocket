@@ -1,3 +1,6 @@
+lint:
+	golangci-lint run
+
 autobahn:
 	docker run -it --rm \
 		-v "${PWD}:/config" \
