@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	"github.com/Mort4lis/ws-echo-server/internal/websocket"
 	"log"
 	"net/http"
+
+	"github.com/Mort4lis/ws-echo-server/internal/websocket"
 )
 
 func initWebsocket(w http.ResponseWriter, req *http.Request) {
@@ -20,11 +21,13 @@ func initWebsocket(w http.ResponseWriter, req *http.Request) {
 		typ, payload, err := conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
+
 			return
 		}
 
 		if err = conn.WriteMessage(typ, payload); err != nil {
 			log.Println(err)
+
 			return
 		}
 	}

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/Mort4lis/ws-echo-server/internal"
 	"log"
+
+	"github.com/Mort4lis/ws-echo-server/internal"
 )
 
 func main() {

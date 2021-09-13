@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-// Close codes defined in RFC 6455
+// Close codes defined in RFC 6455.
 const (
 	CloseNormalClosure           = 1000
 	CloseGoingAway               = 1001
@@ -76,6 +76,7 @@ func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 
 		if fr.IsText() || fr.IsBinary() {
 			c.reader = newMessageReader(c, fr.opcode, fr.payload, !fr.isFragment)
+
 			return fr.opcode, c.reader, nil
 		}
 	}
@@ -127,6 +128,7 @@ func (c *Conn) receive() (frame, error) {
 
 		length = binary.BigEndian.Uint64(lenBytes)
 	}
+
 	fr.length = length
 
 	maskKey, err := c.read(4)
@@ -142,14 +144,18 @@ func (c *Conn) receive() (frame, error) {
 	for i := uint64(0); i < uint64(len(payload)); i++ {
 		payload[i] ^= maskKey[i%4]
 	}
-	fr.payload = payload
 
-	closeErr := c.validate(fr)
-	if closeErr != nil {
+	fr.payload = payload
+	if closeErr := c.validate(fr); closeErr != nil {
 		c.closeErr = closeErr
+
 		return fr, closeErr
 	}
 
+	return fr, c.processReceivedFrame(fr)
+}
+
+func (c *Conn) processReceivedFrame(fr frame) error {
 	switch fr.opcode {
 	case CloseOpcode:
 		closeCode := CloseNormalClosure
@@ -157,31 +163,31 @@ func (c *Conn) receive() (frame, error) {
 			closeCode = int(binary.BigEndian.Uint16(fr.payload[:2]))
 		}
 
-		err = c.close(closeCode)
-		if err != nil {
-			return fr, err
+		if err := c.close(closeCode); err != nil {
+			return err
 		}
 
 		c.closeErr = &CloseError{code: closeCode}
-		return fr, c.closeErr
+
+		return c.closeErr
 	case PingOpcode:
 		pongFr := fr
 		pongFr.opcode = PongOpcode
-		err = c.send(pongFr)
-		if err != nil {
-			return fr, err
+
+		if err := c.send(pongFr); err != nil {
+			return err
 		}
 	case ContinuationOpcode:
 		if c.reader == nil {
-			return fr, c.setCloseError(errEmptyContinueFrames)
+			return c.setCloseError(errEmptyContinueFrames)
 		}
 	case TextOpcode, BinaryOpcode:
 		if c.reader != nil {
-			return fr, c.setCloseError(errInvalidContinuationFrame)
+			return c.setCloseError(errInvalidContinuationFrame)
 		}
 	}
 
-	return fr, nil
+	return nil
 }
 
 func (c *Conn) read(size uint64) ([]byte, error) {
@@ -197,24 +203,29 @@ func (c *Conn) validate(fr frame) *CloseError {
 	if fr.IsControl() && (fr.length > 125 || fr.isFragment) {
 		return errInvalidControlFrame
 	}
+
 	if fr.reserved > 0 {
 		return errNonZeroRSVFrame
 	}
+
 	if fr.opcode > BinaryOpcode && fr.opcode < CloseOpcode || fr.opcode > PongOpcode {
 		return errReservedOpcodeFrame
 	}
-	if fr.IsClose() {
-		if len(fr.payload) >= 2 {
-			code := int(binary.BigEndian.Uint16(fr.payload[:2]))
-			reason := fr.payload[2:]
-			if !IsValidReceivedCloseCode(code) {
-				return errInvalidClosureCode
-			}
-			if !utf8.Valid(reason) {
-				return errInvalidUtf8Payload
-			}
-		} else if len(fr.payload) != 0 {
+
+	if fr.IsClose() && len(fr.payload) != 0 {
+		if len(fr.payload) < 2 {
 			return errInvalidClosurePayload
+		}
+
+		code := int(binary.BigEndian.Uint16(fr.payload[:2]))
+		reason := fr.payload[2:]
+
+		if !IsValidReceivedCloseCode(code) {
+			return errInvalidClosureCode
+		}
+
+		if !utf8.Valid(reason) {
+			return errInvalidUtf8Payload
 		}
 	}
 
@@ -236,6 +247,7 @@ func (c *Conn) NextWriter(messageType byte) (io.WriteCloser, error) {
 	}
 
 	c.writer = newMessageWriter(c, messageType)
+
 	return c.writer, nil
 }
 
@@ -262,6 +274,7 @@ func (c *Conn) send(fr frame) error {
 	}
 
 	length := uint64(len(fr.payload))
+
 	switch {
 	case length <= 125:
 		data[1] = byte(length)
@@ -280,6 +293,7 @@ func (c *Conn) send(fr frame) error {
 	}
 
 	data = append(data, fr.payload...)
+
 	return c.write(data)
 }
 
@@ -287,11 +301,13 @@ func (c *Conn) write(data []byte) error {
 	if _, err := c.rw.Write(data); err != nil {
 		return err
 	}
+
 	return c.rw.Flush()
 }
 
 func (c *Conn) setCloseError(err *CloseError) error {
 	c.closeErr = err
+
 	return err
 }
 
@@ -306,6 +322,7 @@ func (c *Conn) Close() error {
 func (c *Conn) close(statusCode int) error {
 	payload := make([]byte, 2)
 	binary.BigEndian.PutUint16(payload, uint16(statusCode))
+
 	fr := frame{
 		opcode:  CloseOpcode,
 		payload: payload,

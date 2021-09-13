@@ -25,6 +25,7 @@ func (w *messageWriter) Write(p []byte) (int, error) {
 	}
 
 	n := 0
+
 	for len(p) > 0 {
 		if len(w.buff[w.pos:]) == 0 {
 			fr := frame{
@@ -56,6 +57,7 @@ func (w *messageWriter) getOpcode() byte {
 	if w.wasFragment {
 		return ContinuationOpcode
 	}
+
 	return w.messageType
 }
 
@@ -69,8 +71,7 @@ func (w *messageWriter) Close() error {
 		payload: w.buff[:w.pos],
 	}
 
-	err := w.conn.send(fr)
-	if err != nil {
+	if err := w.conn.send(fr); err != nil {
 		return err
 	}
 

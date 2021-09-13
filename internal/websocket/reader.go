@@ -28,8 +28,10 @@ func (r *messageReader) Read(p []byte) (int, error) {
 	}
 
 	if !r.isLast && len(r.buff[r.pos:]) < len(p) {
-		var fr frame
-		var err error
+		var (
+			fr  frame
+			err error
+		)
 
 		for r.conn.closeErr == nil {
 			fr, err = r.conn.receive()
@@ -52,6 +54,7 @@ func (r *messageReader) Read(p []byte) (int, error) {
 
 	n := copy(p, r.buff[r.pos:])
 	r.pos += n
+
 	return n, nil
 }
 

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"errors"
-	wsHandlers "github.com/Mort4lis/ws-echo-server/internal/websocket/handlers"
 	"log"
 	"net"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	wsHandlers "github.com/Mort4lis/ws-echo-server/internal/websocket/handlers"
 )
 
 type App struct {

@@ -17,6 +17,7 @@ func (e HandshakeError) Error() string {
 func newHandshakeError(w http.ResponseWriter, status int, reason string) error {
 	err := HandshakeError{reason: reason}
 	http.Error(w, err.Error(), status)
+
 	return err
 }
 
@@ -66,6 +67,7 @@ func Upgrade(w http.ResponseWriter, req *http.Request) (*Conn, error) {
 	rawResp := fmt.Sprintf(handshakeResponseTemplate, createSecret(clientSecret))
 	if _, err = netConn.Write([]byte(rawResp)); err != nil {
 		_ = netConn.Close()
+
 		return nil, err
 	}
 
