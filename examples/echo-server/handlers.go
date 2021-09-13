@@ -1,10 +1,10 @@
-package handlers
+package main
 
 import (
 	"log"
 	"net/http"
 
-	"github.com/Mort4lis/ws-echo-server/internal/websocket"
+	"github.com/Mort4lis/websocket"
 )
 
 func initWebsocket(w http.ResponseWriter, req *http.Request) {

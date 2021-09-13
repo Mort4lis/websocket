@@ -1,4 +1,4 @@
-package internal
+package main
 
 import (
 	"errors"
@@ -9,8 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	wsHandlers "github.com/Mort4lis/ws-echo-server/internal/websocket/handlers"
 )
 
 type App struct {
@@ -19,7 +17,7 @@ type App struct {
 
 func NewApp() *App {
 	mux := http.NewServeMux()
-	wsHandlers.RegisterHTTPHandlers(mux)
+	mux.HandleFunc("/", initWebsocket)
 
 	return &App{
 		server: &http.Server{
