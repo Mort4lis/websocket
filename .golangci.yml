@@ -1,6 +1,14 @@
 run:
   timeout: 1m
 
+linters-settings:
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: exported
+      - name: indent-error-flow
+
 linters:
   disable-all: true
   enable:
@@ -53,6 +61,7 @@ linters:
     - prealloc
     - nlreturn
     - unparam
+    - revive
     # - dupl
     # - gochecknoglobals
     # - gochecknoinits
@@ -65,5 +74,7 @@ linters:
     # - testpackage
     # - cyclop
     # - errorlint
-    # - revive
     # - tagliatelle
+
+issues:
+  exclude-use-default: false
