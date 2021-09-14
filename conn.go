@@ -56,6 +56,7 @@ type Conn struct {
 	writer io.WriteCloser
 
 	closeErr *CloseError
+	isServer bool
 }
 
 func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
@@ -131,9 +132,12 @@ func (c *Conn) receive() (frame, error) {
 
 	fr.length = length
 
-	maskKey, err := c.read(4)
-	if err != nil {
-		return fr, err
+	var maskKey []byte
+	if fr.isMasked {
+		maskKey, err = c.read(4)
+		if err != nil {
+			return fr, err
+		}
 	}
 
 	payload, err := c.read(length)
@@ -141,8 +145,10 @@ func (c *Conn) receive() (frame, error) {
 		return fr, err
 	}
 
-	for i := uint64(0); i < uint64(len(payload)); i++ {
-		payload[i] ^= maskKey[i%4]
+	if fr.isMasked {
+		for i := uint64(0); i < uint64(len(payload)); i++ {
+			payload[i] ^= maskKey[i%4]
+		}
 	}
 
 	fr.payload = payload
@@ -290,6 +296,17 @@ func (c *Conn) send(fr frame) error {
 		lenBytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(lenBytes, length)
 		data = append(data, lenBytes...)
+	}
+
+	if !c.isServer {
+		data[1] |= 0x80
+
+		maskKey := newMaskKey()
+		for i := 0; i < len(fr.payload); i++ {
+			fr.payload[i] ^= maskKey[i%len(maskKey)]
+		}
+
+		data = append(data, maskKey[:]...)
 	}
 
 	data = append(data, fr.payload...)

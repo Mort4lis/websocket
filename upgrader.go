@@ -72,7 +72,8 @@ func Upgrade(w http.ResponseWriter, req *http.Request) (*Conn, error) {
 	}
 
 	return &Conn{
-		conn: netConn,
-		rw:   rw,
+		isServer: true,
+		conn:     netConn,
+		rw:       rw,
 	}, nil
 }
