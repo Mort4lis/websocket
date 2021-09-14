@@ -2,6 +2,14 @@ package websocket
 
 import "fmt"
 
+type HandshakeError struct {
+	reason string
+}
+
+func (e HandshakeError) Error() string {
+	return e.reason
+}
+
 type CloseError struct {
 	code int
 	text string

@@ -23,7 +23,7 @@ func checkHeaderContains(header http.Header, key string, value string) bool {
 	return header.Get(key) == value
 }
 
-func createSecret(key string) string {
+func hashWebsocketKey(key string) string {
 	hash := sha1.New()
 	hash.Write([]byte(key))
 	hash.Write(keyGUID)
@@ -31,7 +31,7 @@ func createSecret(key string) string {
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
 }
 
-func createClientSecret() (string, error) {
+func randomWebsocketKey() (string, error) {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err

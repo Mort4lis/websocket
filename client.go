@@ -15,7 +15,7 @@ type Dialer struct {
 	HandshakeTimeout time.Duration
 	TLSConfig        *tls.Config
 
-	secret string
+	wsKey string
 }
 
 func (d *Dialer) Dial(urlStr string) (*Conn, error) {
@@ -44,12 +44,12 @@ func (d *Dialer) DialContext(ctx context.Context, urlStr string) (*Conn, error) 
 		defer cancel()
 	}
 
-	secret, err := createClientSecret()
+	wsKey, err := randomWebsocketKey()
 	if err != nil {
 		return nil, err
 	}
 
-	d.secret = secret
+	d.wsKey = wsKey
 
 	req, err := d.prepareHandshakeRequest(ctx, addr.String())
 	if err != nil {
@@ -93,7 +93,7 @@ func (d *Dialer) prepareHandshakeRequest(ctx context.Context, addr string) (*htt
 
 	req.Header.Set("Upgrade", "WebSocket")
 	req.Header.Set("Connection", "Upgrade")
-	req.Header.Set("Sec-WebSocket-Key", d.secret)
+	req.Header.Set("Sec-WebSocket-Key", d.wsKey)
 	req.Header.Set("Sec-WebSocket-Version", "13")
 
 	return req, nil
@@ -107,11 +107,20 @@ func (d *Dialer) handleHandshakeResponse(r *bufio.Reader, req *http.Request) err
 
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusSwitchingProtocols ||
-		!checkHeaderContains(resp.Header, "Upgrade", "WebSocket") ||
-		!checkHeaderContains(resp.Header, "Connection", "Upgrade") ||
-		resp.Header.Get("Sec-Websocket-Accept") != createSecret(d.secret) {
-		return HandshakeError{"bad handshake"}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		return HandshakeError{"bad status code, expect status switching protocols (101)"}
+	}
+
+	if !checkHeaderContains(resp.Header, "Upgrade", "WebSocket") {
+		return HandshakeError{"response Upgrade header value doesn't equal WebSocket"}
+	}
+
+	if !checkHeaderContains(resp.Header, "Connection", "Upgrade") {
+		return HandshakeError{"response Connection header value doesn't equal Upgrade"}
+	}
+
+	if resp.Header.Get("Sec-Websocket-Accept") != hashWebsocketKey(d.wsKey) {
+		return HandshakeError{"bad calculated Sec-Websocket-Accept header value"}
 	}
 
 	return nil

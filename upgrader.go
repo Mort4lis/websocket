@@ -6,14 +6,6 @@ import (
 	"strings"
 )
 
-type HandshakeError struct {
-	reason string
-}
-
-func (e HandshakeError) Error() string {
-	return e.reason
-}
-
 func newHandshakeError(w http.ResponseWriter, status int, reason string) error {
 	err := HandshakeError{reason: reason}
 	http.Error(w, err.Error(), status)
@@ -64,7 +56,7 @@ func Upgrade(w http.ResponseWriter, req *http.Request) (*Conn, error) {
 		return nil, newHandshakeError(w, http.StatusInternalServerError, err.Error())
 	}
 
-	rawResp := fmt.Sprintf(handshakeResponseTemplate, createSecret(clientSecret))
+	rawResp := fmt.Sprintf(handshakeResponseTemplate, hashWebsocketKey(clientSecret))
 	if _, err = netConn.Write([]byte(rawResp)); err != nil {
 		_ = netConn.Close()
 
