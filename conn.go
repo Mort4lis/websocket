@@ -82,7 +82,7 @@ func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 			return noFrame, nil, err
 		}
 
-		if fr.IsText() || fr.IsBinary() {
+		if fr.isText() || fr.isBinary() {
 			c.reader = newMessageReader(c, fr.opcode, fr.payload, !fr.isFragment)
 
 			return fr.opcode, c.reader, nil
@@ -215,7 +215,7 @@ func (c *Conn) read(size uint64) ([]byte, error) {
 }
 
 func (c *Conn) validate(fr frame) *CloseError {
-	if fr.IsControl() && (fr.length > 125 || fr.isFragment) {
+	if fr.isControl() && (fr.length > 125 || fr.isFragment) {
 		return errInvalidControlFrame
 	}
 
@@ -227,7 +227,7 @@ func (c *Conn) validate(fr frame) *CloseError {
 		return errReservedOpcodeFrame
 	}
 
-	if fr.IsClose() && len(fr.payload) != 0 {
+	if fr.isClose() && len(fr.payload) != 0 {
 		if len(fr.payload) < 2 {
 			return errInvalidClosurePayload
 		}

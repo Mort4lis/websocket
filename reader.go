@@ -39,7 +39,7 @@ func (r *messageReader) Read(p []byte) (int, error) {
 				return 0, err
 			}
 
-			if !fr.IsControl() {
+			if !fr.isControl() {
 				break
 			}
 		}

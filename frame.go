@@ -21,22 +21,22 @@ type frame struct {
 	payload    []byte
 }
 
-func (f frame) IsText() bool {
+func (f frame) isText() bool {
 	return f.opcode == TextOpcode
 }
 
-func (f frame) IsBinary() bool {
+func (f frame) isBinary() bool {
 	return f.opcode == BinaryOpcode
 }
 
-func (f frame) IsContinuation() bool {
+func (f frame) isContinuation() bool {
 	return f.opcode == ContinuationOpcode
 }
 
-func (f frame) IsClose() bool {
+func (f frame) isClose() bool {
 	return f.opcode == CloseOpcode
 }
 
-func (f frame) IsControl() bool {
+func (f frame) isControl() bool {
 	return f.opcode == CloseOpcode || f.opcode == PingOpcode || f.opcode == PongOpcode
 }
