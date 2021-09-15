@@ -1,13 +1,15 @@
 package websocket
 
+// Type of frames which defines in RFC 6455.
 const (
-	noFrame            = 0xff
 	ContinuationOpcode = 0x00
 	TextOpcode         = 0x01
 	BinaryOpcode       = 0x02
 	CloseOpcode        = 0x08
 	PingOpcode         = 0x09
 	PongOpcode         = 0xA
+
+	noFrame = 0xff
 )
 
 type frame struct {

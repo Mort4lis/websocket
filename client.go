@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+// Dialer is a type which represents the client settings to establish a
+// WebSocket connection.
 type Dialer struct {
 	HandshakeTimeout time.Duration
 	TLSConfig        *tls.Config
@@ -18,10 +20,16 @@ type Dialer struct {
 	wsKey string
 }
 
+// Dial creates a new client WebSocket connection using DialContext with a background context.
 func (d *Dialer) Dial(urlStr string) (*Conn, error) {
 	return d.DialContext(context.Background(), urlStr)
 }
 
+// DialContext creates a new client WebSocket connection.
+//
+// At first, it opens a new tcp connection over which it sends http handshake
+// request for switching protocol to WebSocket. If handshake fails, DialContext returns
+// HandshakeError with detailed reason about error.
 func (d *Dialer) DialContext(ctx context.Context, urlStr string) (*Conn, error) {
 	addr, err := url.Parse(urlStr)
 	if err != nil {

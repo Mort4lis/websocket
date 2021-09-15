@@ -2,6 +2,8 @@ package websocket
 
 import "fmt"
 
+// HandshakeError is a type which represents an error occurs
+// in process handshake to establish WebSocket connection.
 type HandshakeError struct {
 	reason string
 }
@@ -10,12 +12,13 @@ func (e HandshakeError) Error() string {
 	return e.reason
 }
 
+// CloseError is a type which represents closure WebSocket error.
 type CloseError struct {
 	code int
 	text string
 }
 
-func NewCloseError(code int, text string) *CloseError {
+func newCloseError(code int, text string) *CloseError {
 	return &CloseError{code, text}
 }
 
@@ -24,35 +27,35 @@ func (e *CloseError) Error() string {
 }
 
 var (
-	errInvalidControlFrame = NewCloseError(
+	errInvalidControlFrame = newCloseError(
 		CloseProtocolError,
 		"all control frames must have a payload length of 125 bytes or less and must not be fragmented",
 	)
-	errNonZeroRSVFrame = NewCloseError(
+	errNonZeroRSVFrame = newCloseError(
 		CloseProtocolError,
 		"reserved bits must be set at 0, when no extension defining RSV meaning has been negotiated",
 	)
-	errReservedOpcodeFrame = NewCloseError(
+	errReservedOpcodeFrame = newCloseError(
 		CloseProtocolError,
 		"opcodes 0x03-0x07 and 0xB-0xF are reserved for further frames",
 	)
-	errInvalidContinuationFrame = NewCloseError(
+	errInvalidContinuationFrame = newCloseError(
 		CloseProtocolError,
 		"the fragmented frame after initial frame doesn't have continuation opcode",
 	)
-	errEmptyContinueFrames = NewCloseError(
+	errEmptyContinueFrames = newCloseError(
 		CloseProtocolError,
 		"there is no frames to continue",
 	)
-	errInvalidClosurePayload = NewCloseError(
+	errInvalidClosurePayload = newCloseError(
 		CloseProtocolError,
 		"invalid close payload",
 	)
-	errInvalidClosureCode = NewCloseError(
+	errInvalidClosureCode = newCloseError(
 		CloseProtocolError,
 		"invalid closure code",
 	)
-	errInvalidUtf8Payload = NewCloseError(
+	errInvalidUtf8Payload = newCloseError(
 		CloseInvalidFramePayloadData,
 		"invalid UTF-8 text payload",
 	)

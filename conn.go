@@ -44,10 +44,11 @@ var validReceivedCloseCodes = map[int]bool{
 	CloseTLSHandshake:            false,
 }
 
-func IsValidReceivedCloseCode(code int) bool {
+func isValidReceivedCloseCode(code int) bool {
 	return validReceivedCloseCodes[code] || (code >= 3000 && code <= 4999)
 }
 
+// Conn is a type which represents the WebSocket connection.
 type Conn struct {
 	conn net.Conn
 	rw   *bufio.ReadWriter
@@ -59,6 +60,12 @@ type Conn struct {
 	isServer bool
 }
 
+// NextReader returns the message type of the first fragmented frame
+// (either TextOpcode or BinaryOpcode) and reader, using which you can receive
+// other frame bytes.
+//
+// It discards the previous reader if it's not empty. There can be at most one
+// open reader on a connection.
 func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 	if c.reader != nil {
 		_, err = ioutil.ReadAll(c.reader)
@@ -85,6 +92,8 @@ func (c *Conn) NextReader() (frameType byte, r io.Reader, err error) {
 	return noFrame, nil, c.closeErr
 }
 
+// ReadMessage is a helper method for getting all fragmented frames in one message.
+// It uses NextReader under the hood.
 func (c *Conn) ReadMessage() (messageType byte, payload []byte, err error) {
 	frameType, r, err := c.NextReader()
 	if err != nil {
@@ -226,7 +235,7 @@ func (c *Conn) validate(fr frame) *CloseError {
 		code := int(binary.BigEndian.Uint16(fr.payload[:2]))
 		reason := fr.payload[2:]
 
-		if !IsValidReceivedCloseCode(code) {
+		if !isValidReceivedCloseCode(code) {
 			return errInvalidClosureCode
 		}
 
@@ -238,6 +247,11 @@ func (c *Conn) validate(fr frame) *CloseError {
 	return nil
 }
 
+// NextWriter returns a writer using which you can send message partially.
+// The writer's Close method flushes the complete message to the network.
+//
+// It discards the previous writer if it's not empty. There can be at most one
+// open writer on a connection.
 func (c *Conn) NextWriter(messageType byte) (io.WriteCloser, error) {
 	if c.closeErr != nil {
 		return nil, c.closeErr
@@ -257,6 +271,8 @@ func (c *Conn) NextWriter(messageType byte) (io.WriteCloser, error) {
 	return c.writer, nil
 }
 
+// WriteMessage is a helper method to send message entire.
+// It uses a NextWriter under the hood.
 func (c *Conn) WriteMessage(messageType byte, payload []byte) error {
 	w, err := c.NextWriter(messageType)
 	if err != nil {
@@ -328,6 +344,9 @@ func (c *Conn) setCloseError(err *CloseError) error {
 	return err
 }
 
+// Close sends control normal close frame if wasn't any errors. After that
+// the tcp connection will be closed. Otherwise, it sends close frame
+// with status code depending on happened error.
 func (c *Conn) Close() error {
 	if c.closeErr != nil {
 		return c.close(c.closeErr.code)
