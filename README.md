@@ -1,5 +1,13 @@
 # Custom WebSocket implementation library
 
+![ci](https://github.com/Mort4lis/websocket/actions/workflows/main.yml/badge.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Mort4lis/websocket.svg)](https://pkg.go.dev/github.com/Mort4lis/websocket)
+![go-version](https://img.shields.io/github/go-mod/go-version/Mort4lis/websocket)
+![code-size](https://img.shields.io/github/languages/code-size/Mort4lis/websocket)
+![total-lines](https://img.shields.io/tokei/lines/github/Mort4lis/websocket)
+
+![Alt text](./images/websockets-golang.png)
+
 ## Motivation
 
 The main purpose of this developed package is education. I hold the rule which means if you want to figure out or
@@ -113,3 +121,5 @@ func Echo(conn *websocket.Conn) error {
 	return nil
 }
 ```
+
+For more detailed information please visit [documentation](https://pkg.go.dev/github.com/Mort4lis/websocket).
