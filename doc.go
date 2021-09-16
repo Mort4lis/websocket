@@ -1,6 +1,6 @@
 // Package websocket implements the WebSocket protocol defined in RFC 6455.
 //
-// How to use
+// Usage
 //
 // The Conn type represents the WebSocket connection. if you are developing a server
 // application you should use Upgrade function in your http handler to switching protocol
