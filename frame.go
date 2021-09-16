@@ -29,10 +29,6 @@ func (f frame) isBinary() bool {
 	return f.opcode == BinaryOpcode
 }
 
-func (f frame) isContinuation() bool {
-	return f.opcode == ContinuationOpcode
-}
-
 func (f frame) isClose() bool {
 	return f.opcode == CloseOpcode
 }
