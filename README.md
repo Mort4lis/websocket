@@ -47,10 +47,9 @@ the Autobahn's report you should clone this repository and run test suites
 $ go get github.com/Mort4lis/websocket
 ```
 
-## Usage
+## How to use
 
-The `websocket.Conn` type represents the WebSocket connection. if you are developing a server application you should
-use `websocket.Upgrade` function in your http handler to switching protocol to WebSocket.
+### Simple server
 
 ```go
 package main
@@ -65,16 +64,29 @@ import (
 func handler(w http.ResponseWriter, req *http.Request) {
 	conn, err := websocket.Upgrade(w, req)
 	if err != nil {
-		log.Println(err)
 		return
 	}
 
-	_ = conn
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	for {
+		typ, payload, err := conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if err = conn.WriteMessage(typ, payload); err != nil {
+			log.Println(err)
+			return
+		}
+	}
 }
 ```
 
-Otherwise, if you are interesting to use websocket package as a client you should invoke `Dial` at first (
-or `DialContext`). For example:
+### Simple client
 
 ```go
 package main
@@ -91,35 +103,22 @@ func main() {
 		HandshakeTimeout: 10 * time.Second,
 	}
 
-	conn, err := dialer.Dial("ws://localhost:8080")
+	conn, err := dialer.Dial("ws://127.0.0.1:8080")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
-	_ = conn
-}
-```
-
-Having `Conn` instance you can send and receive message due WebSocket protocol, calling
-`WriteMessage` and `ReadMessage`.
-
-```go
-package main
-
-import "github.com/Mort4lis/websocket"
-
-func Echo(conn *websocket.Conn) error {
 	typ, payload, err := conn.ReadMessage()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-
+	
 	if err = conn.WriteMessage(typ, payload); err != nil {
-		return err
+		log.Fatal(err)
 	}
-
-	return nil
 }
 ```
-
 For more detailed information please visit [documentation](https://pkg.go.dev/github.com/Mort4lis/websocket).
