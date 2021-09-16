@@ -13,21 +13,26 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-      
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.42.1
-   
+          version: "v1.42.1"
+
   test:
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-       
+
       - name: Setup Go
         uses: actions/setup-go@v2
-      
+        with:
+          go-version: "1.16"
+
       - name: Run example WebSocket echo server
-        uses: go run ./examples/echo-server/main.go
+        run: go run github.com/Mort4lis/websocket/examples/echo-server &
+
+      - name: Run tests
+        run: make test
